@@ -15,6 +15,8 @@ class ResultTableViewController: UITableViewController, YelpAPIControllerProcol 
     var businesses = [Business]()
     var term: String?
     var location: CLLocation?
+    var hotAndNew: Bool?
+    var cashback: Bool?
     
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -24,8 +26,10 @@ class ResultTableViewController: UITableViewController, YelpAPIControllerProcol 
     func requestYelp(){
         api = YelpAPIController()
         api.delegate = self
-        if let location = location, let term = term {
-            api.getAuthToken(location: location, term: term)
+        if let location = location, let term = term, let hotAndNew = hotAndNew
+            , let cashback = cashback {
+            api.getBusinessSearch(location: location, term: term, hotAndNew: hotAndNew
+                , cashback: cashback)
         }
     }
     
@@ -42,7 +46,6 @@ class ResultTableViewController: UITableViewController, YelpAPIControllerProcol 
     }
     
     override func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
-        // #warning Incomplete implementation, return the number of rows
         return businesses.count
     }
     
@@ -58,15 +61,36 @@ class ResultTableViewController: UITableViewController, YelpAPIControllerProcol 
         })
     }
     
-    /*
-     override func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
-     let cell = tableView.dequeueReusableCell(withIdentifier: "reuseIdentifier", for: indexPath)
-     
-     // Configure the cell...
-     
-     return cell
-     }
-     */
+    
+    override func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
+        let cell = tableView.dequeueReusableCell(withIdentifier: "reuseIdentifier", for: indexPath) as! BusinessTableViewCell
+        let business = businesses[indexPath.row]
+        cell.name.text = business.name
+        cell.distance.text = business.distance
+        cell.category.text = business.categories
+        if let url = business.img_url
+        {
+            if let data = NSData(contentsOf: url)
+            {
+                cell.preview.contentMode = UIViewContentMode.scaleAspectFit
+                cell.preview.image = UIImage(data: data as Data)
+            }
+        }
+        return cell
+    }
+    
+    override func prepare(for segue: UIStoryboardSegue, sender: Any?) {
+        if segue.identifier == "showDetailsSegue" {
+            if let selectedCell = sender as? BusinessTableViewCell {
+                if let selectedIndex = tableView.indexPath(for: selectedCell) {
+                    let destinationViewController = segue.destination as! DetailsViewController
+                    destinationViewController.business = businesses[selectedIndex.row]
+                }
+            }
+        }
+        
+    }
+    
     
     /*
      // Override to support conditional editing of the table view.

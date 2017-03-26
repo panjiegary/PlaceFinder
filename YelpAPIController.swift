@@ -25,7 +25,7 @@ class YelpAPIController {
         var urlComponent = URLComponents()
         urlComponent.scheme = "https"
         urlComponent.host = "api.yelp.com"
-        urlComponent.path = "oauth2/token"
+        urlComponent.path = "/oauth2/token"
         
         if let url = urlComponent.url {
             let request = NSMutableURLRequest(url: url)
@@ -37,7 +37,7 @@ class YelpAPIController {
             
             let task = session.dataTask(with: request as URLRequest, completionHandler: {(data, request, error) -> Void in
                 if (error != nil) {
-                    print(error?.localizedDescription)
+                    print(error?.localizedDescription ?? "error")
                 } else {
                     if let receivedData = data, let jsonResult = try? JSONSerialization.jsonObject(with: receivedData, options: []) as? [String: Any] {
                         print(jsonResult ?? "no result")
@@ -46,6 +46,8 @@ class YelpAPIController {
                     }
                 }
             })
+            
+            task.resume()
             
         }
         
@@ -64,47 +66,68 @@ class YelpAPIController {
                 token = tokenValue
                 
             }
-            return token
+        }
+        return token
+    }
+    
+    func getBusinessSearch(location: CLLocation, term: String, hotAndNew: Bool, cashback: Bool) {
+        guard let token = tokenStored() else {
+            print("no token stored")
+            return
         }
         
-        func getBusinessSearch( location: CLLocation, term: String) {
-            guard let token = tokenStored() else {
-                print("no token stored")
-                return
+        let session = URLSession.shared
+        var urlComponent = URLComponents()
+        urlComponent.scheme = "https"
+        urlComponent.host = "api.yelp.com"
+        urlComponent.path = "/v3/businesses/search"
+        
+        let radius = 5000
+        let latitude = location.coordinate.latitude
+        let longitude = location.coordinate.longitude
+        
+        var attributesString = ""
+        if hotAndNew == true {
+            attributesString = "hot_and_new"
+            if cashback == true {
+                attributesString.append(",cashback")
             }
+        } else {
+            if cashback == true {
+                attributesString = "cashback"
+            }
+        }
+        urlComponent.queryItems = [
+            URLQueryItem(name: "term", value: String(term)),
+            URLQueryItem(name: "radius", value: String(radius)),
+            URLQueryItem(name: "latitude", value: String(latitude)),
+            URLQueryItem(name: "longitude", value: String(longitude))
+        ]
+        if attributesString != "" {
+            let attributes = URLQueryItem(name: "attributes", value: attributesString)
+            urlComponent.queryItems?.append(attributes)
+        }
+        if let url = urlComponent.url {
+            let request = NSMutableURLRequest(url: url)
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
             
-            let session = URLSession.shared
-            var urlComponent = URLComponents()
-            urlComponent.scheme = "https"
-            urlComponent.host = "api.yelp.com"
-            urlComponent.path = "v3/businesses/search"
-            
-            let radius = 5000
-            urlComponent.queryItems = [
-                URLQueryItem(name: "term", value: String(term)),
-                URLQueryItem(name: "radius", value: String(radius))
-            ]
-            if let url = urlComponent.url {
-                var request = NSMutableURLRequest(url: url)
-                request.setValue("Bearer\(token)", forHTTPHeaderField: "Authorization")
-                
-                let task = session.dataTask(with: request as URLRequest, completionHandler: {
-                    (data, response, error) -> Void in
-                    if (error != nil) {
-                        print("error", error?.localizedDescription)
-                    } else {
-                        if let receivedData = data, let jsonResult = try? JSONSerialization.jsonObject(with: receivedData, options: .allowFragments) as? [String: Any] {
-                            print(jsonResult!)
-                            if let businesses = jsonResult!["businesses"] as? [[String: Any]] {
-                                self.delegate?.didReceiveAPIResults(results: businesses)
-                            }
-                            
+            let task = session.dataTask(with: request as URLRequest, completionHandler: {
+                (data, response, error) -> Void in
+                if (error != nil) {
+                    print("error", error?.localizedDescription ?? "")
+                } else {
+                    if let receivedData = data, let jsonResult = try? JSONSerialization.jsonObject(with: receivedData, options: .allowFragments) as? [String: Any] {
+                        print(jsonResult!)
+                        if let businesses = jsonResult!["businesses"] as? [[String: Any]] {
+                            self.delegate?.didReceiveAPIResults(results: businesses)
                         }
+                        
                     }
-                })
-                 task.resume()
-            }
-            
+                }
+            })
+            task.resume()
         }
         
+    }
+    
 }
